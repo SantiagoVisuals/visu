@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VISU — Photography Explorer</title>
+  <meta name="description" content="Explora fotografías de alta calidad con la API de Unsplash. Busca, descubre y descarga imágenes.">
+  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ══════════════════════════════════════════════════════
+       COMPONENTE: Header fijo con buscador
+       ══════════════════════════════════════════════════════ -->
+  <app-header
+    :total-photos="totalResults"
+    :search-query="searchQuery"
+    @search="handleSearch"
+    @home="goHome"
+  ></app-header>
+
+  <!-- ══════════════════════════════════════════════════════
+       ALERTA: API no configurada
+       ══════════════════════════════════════════════════════ -->
+  <div class="state-message" v-if="!apiReady">
+    <div class="state-icon">🔑</div>
+    <div class="state-title">API Key requerida</div>
+    <div class="state-sub">
+      Abre el archivo <strong>js/api.js</strong> y reemplaza
+      <code>TU_ACCESS_KEY_AQUI</code> con tu clave de
+      <a href="https://unsplash.com/developers" target="_blank" style="color: var(--accent);">Unsplash Developers</a>.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       HERO — Título y buscador principal
+       ══════════════════════════════════════════════════════ -->
+  <section class="hero" v-if="apiReady && !searchQuery && !activeCategory">
+    <p class="hero-eyebrow">Powered by Unsplash API</p>
+    <h1 class="hero-title">
+      Descubre fotografía<br><em>extraordinaria</em>
+    </h1>
+    <p class="hero-desc">
+      Explora miles de imágenes de alta calidad de fotógrafos de todo el mundo. Busca, descubre y descarga.
+    </p>
+    <div class="hero-search">
+      <span class="hero-search-icon">⌕</span>
+      <input
+        type="text"
+        v-model="searchQuery"
+        placeholder="Buscar fotografías, estilos, lugares…"
+        @keydown.enter="heroSearch(searchQuery)"
+      />
+      <button class="hero-search-btn" @click="heroSearch(searchQuery)">Buscar</button>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════
+       CATEGORÍAS — Chips de filtros temáticos
+       ══════════════════════════════════════════════════════ -->
+  <div class="categories" v-if="apiReady">
+    <button
+      v-for="cat in categoriesList"
+      :key="cat.value"
+      class="cat-chip"
+      :class="{ active: activeCategory === cat.value }"
+      @click="selectCategory(cat.value)"
+    >
+      {{ cat.icon }} {{ cat.label }}
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       SECCIÓN DE FOTOS
+       ══════════════════════════════════════════════════════ -->
+  <template v-if="apiReady">
+
+    <!-- Encabezado de sección -->
+    <div class="section-header" v-if="photos.length > 0 || searchQuery">
+      <h2 class="section-title">{{ sectionTitle }}</h2>
+      <span class="section-count" v-if="totalResults > 0">
+        {{ totalResults.toLocaleString('es-CO') }} fotos
+      </span>
+    </div>
+
+    <!-- Estado de carga inicial -->
+    <div class="loading-wrap" v-if="loading && photos.length === 0">
+      <div class="spinner"></div>
+      <div class="loading-text">Cargando fotografías…</div>
+    </div>
+
+    <!-- Grid de fotos con componente photo-card -->
+    <div class="photo-grid" v-if="photos.length > 0">
+      <photo-card
+        v-for="photo in photos"
+        :key="photo.id"
+        :photo="photo"
+        @select="openModal"
+      ></photo-card>
+
+      <!-- Skeletons de carga al final -->
+      <template v-if="loadingMore">
+        <div class="photo-skeleton" v-for="n in 4" :key="'sk-'+n"
+             :style="{ height: (180 + Math.random() * 140) + 'px' }">
+        </div>
+      </template>
+    </div>
+
+    <!-- Estado vacío (sin resultados) -->
+    <div class="state-message" v-if="!loading && photos.length === 0 && searchQuery">
+      <div class="state-icon">📷</div>
+      <div class="state-title">Sin resultados</div>
+      <div class="state-sub">
+        No se encontraron fotos para "{{ searchQuery }}". Intenta con otro término.
+      </div>
+    </div>
+
+    <!-- Estado de error -->
+    <div class="state-message" v-if="error">
+      <div class="state-icon">⚠️</div>
+      <div class="state-title">Error de conexión</div>
+      <div class="state-sub">{{ error }}</div>
+    </div>
+
+    <!-- Botón cargar más -->
+    <div class="load-more-wrap" v-if="photos.length > 0 && hasMore">
+      <button
+        class="load-more-btn"
+        :disabled="loadingMore"
+        @click="loadMore"
+      >
+        {{ loadingMore ? 'Cargando…' : 'Cargar más fotos' }}
+      </button>
+    </div>
+
+  </template>
+
+  <!-- ══════════════════════════════════════════════════════
+       COMPONENTE: Modal de detalle de foto
+       ══════════════════════════════════════════════════════ -->
+  <photo-modal
+    :photo="selectedPhoto"
+    :open="modalOpen"
+    @close="closeModal"
+    @download="handleDownload"
+  ></photo-modal>
+
+  <!-- ══════════════════════════════════════════════════════
+       FOOTER
+       ══════════════════════════════════════════════════════ -->
+  <footer class="app-footer">
+    <div>
+      <div class="footer-brand">VIS<span>U</span></div>
+      <p class="footer-text">
+        Imágenes proporcionadas por
+        <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a>
+      </p>
+    </div>
+    <div class="footer-copy">
+      © 2026 VISU — Proyecto académico · Vue.js 3 + Unsplash API
+    </div>
+  </footer>
+
+</div>
+
+<!-- App principal como módulo ES6 -->
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
