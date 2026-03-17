@@ -265,11 +265,12 @@ body > * { position: relative; z-index: 1; }
   margin-bottom: 0.4rem;
 }
 .photo-card-avatar {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 28px; min-width: 28px; max-width: 28px;
+  height: 28px; min-height: 28px; max-height: 28px;
+  border-radius: 50%;
   border: 1.5px solid rgba(255,255,255,0.3);
   object-fit: cover;
   flex-shrink: 0;
-  aspect-ratio: 1 / 1;
 }
 .photo-card-name {
   font-size: 0.8rem; font-weight: 500;
